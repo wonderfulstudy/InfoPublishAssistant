@@ -1,0 +1,33 @@
+<resources>
+    <string name="app_name">开奖助手</string>
+    <string name="title_activity_test">test</string>
+
+    <string name="title_settings">设置</string>
+    <string name="title_game_select">选择游戏</string>
+
+    <string name="game_da_le_tou">大乐透</string>
+    <string name="game_qi_xing_cai">七星彩</string>
+    <string name="game_pai_lie">排列</string>
+
+    <string name="action_back">返回</string>
+    <string name="action_settings">设置</string>
+
+    <string name="setting_screen_rotation">画面旋转</string>
+    <string name="setting_screen_rotation_hint">按确认键依次切换 0° / 90° / 180° / 270°</string>
+    <string name="setting_dpad_follow_rotation">方向键跟随画面旋转</string>
+    <string name="setting_dpad_follow_rotation_hint">旋转后若遥控器上下左右与画面方向不一致，请切换此项</string>
+    <string name="setting_on">开</string>
+    <string name="setting_off">关</string>
+
+    <string name="trend_header_issue">期号</string>
+    <string name="trend_header_numbers">开奖号码</string>
+    <string name="trend_empty">暂无开奖数据</string>
+    <string name="trend_loading">加载中…</string>
+    <string name="trend_loading_more">正在加载更多…</string>
+    <string name="trend_no_more">已加载全部期数</string>
+    <string name="trend_load_failed">加载失败：%1$s</string>
+    <string name="trend_issue_format">%1$s</string>
+    <string name="trend_empty_footer_hint">按上下键浏览更多期数</string>
+
+    <string name="game_select_hint">按方向键选择游戏，确认键进入走势图</string>
+</resources>
