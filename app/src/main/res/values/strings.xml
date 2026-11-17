@@ -30,4 +30,7 @@
     <string name="trend_empty_footer_hint">按上下键浏览更多期数</string>
 
     <string name="game_select_hint">按方向键选择游戏，确认键进入走势图</string>
+
+    <string name="base_url">https://webapi.sporttery.cn/gateway/lottery</string>
+    <string name="get_history_path">getHistoryPageListV1.qry</string>
 </resources>

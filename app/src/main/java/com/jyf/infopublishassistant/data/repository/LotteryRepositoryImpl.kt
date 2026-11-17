@@ -27,4 +27,14 @@ class LotteryRepositoryImpl(
 
     override suspend fun cachedCount(game: LotteryGame): Int =
         drawResultDao.countByGame(game.name)
+
+    override suspend fun fillCacheTo(game: LotteryGame, target: Int, pageSize: Int): Boolean {
+        var lastFetched = pageSize
+        while (drawResultDao.countByGame(game.name) < target) {
+            val page = drawResultDao.countByGame(game.name) / pageSize + 1
+            lastFetched = loadPage(game, page, pageSize)
+            if (lastFetched < pageSize) break
+        }
+        return lastFetched == pageSize
+    }
 }

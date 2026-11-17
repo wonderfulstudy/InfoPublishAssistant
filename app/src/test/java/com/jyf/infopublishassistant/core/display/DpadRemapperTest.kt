@@ -14,11 +14,10 @@ class DpadRemapperTest {
 
     @Test
     fun `rotation 90 maps screen directions into content space`() {
-        // 内容顺时针转 90° 后，页面顶部指向屏幕右侧
-        assertEquals(DpadDirection.LEFT, DpadRemapper.remap(DpadDirection.UP, ScreenRotation.ROTATION_90))
-        assertEquals(DpadDirection.RIGHT, DpadRemapper.remap(DpadDirection.DOWN, ScreenRotation.ROTATION_90))
-        assertEquals(DpadDirection.DOWN, DpadRemapper.remap(DpadDirection.LEFT, ScreenRotation.ROTATION_90))
-        assertEquals(DpadDirection.UP, DpadRemapper.remap(DpadDirection.RIGHT, ScreenRotation.ROTATION_90))
+        assertEquals(DpadDirection.RIGHT, DpadRemapper.remap(DpadDirection.UP, ScreenRotation.ROTATION_270))
+        assertEquals(DpadDirection.LEFT, DpadRemapper.remap(DpadDirection.DOWN, ScreenRotation.ROTATION_270))
+        assertEquals(DpadDirection.UP, DpadRemapper.remap(DpadDirection.LEFT, ScreenRotation.ROTATION_270))
+        assertEquals(DpadDirection.DOWN, DpadRemapper.remap(DpadDirection.RIGHT, ScreenRotation.ROTATION_270))
     }
 
     @Test
@@ -31,10 +30,11 @@ class DpadRemapperTest {
 
     @Test
     fun `rotation 270 maps screen directions into content space`() {
-        assertEquals(DpadDirection.RIGHT, DpadRemapper.remap(DpadDirection.UP, ScreenRotation.ROTATION_270))
-        assertEquals(DpadDirection.LEFT, DpadRemapper.remap(DpadDirection.DOWN, ScreenRotation.ROTATION_270))
-        assertEquals(DpadDirection.UP, DpadRemapper.remap(DpadDirection.LEFT, ScreenRotation.ROTATION_270))
-        assertEquals(DpadDirection.DOWN, DpadRemapper.remap(DpadDirection.RIGHT, ScreenRotation.ROTATION_270))
+        // 内容顺时针转 90° 后，页面顶部指向屏幕右侧
+        assertEquals(DpadDirection.LEFT, DpadRemapper.remap(DpadDirection.UP, ScreenRotation.ROTATION_90))
+        assertEquals(DpadDirection.RIGHT, DpadRemapper.remap(DpadDirection.DOWN, ScreenRotation.ROTATION_90))
+        assertEquals(DpadDirection.DOWN, DpadRemapper.remap(DpadDirection.LEFT, ScreenRotation.ROTATION_90))
+        assertEquals(DpadDirection.UP, DpadRemapper.remap(DpadDirection.RIGHT, ScreenRotation.ROTATION_90))
     }
 
     @Test

@@ -40,17 +40,17 @@
             android:label="@string/title_settings" />
 
         <activity
-            android:name=".feature.trend.DaLeTouTrendActivity"
+            android:name=".feature.trend.DLTTrendActivity"
             android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboardHidden|uiMode|density"
             android:exported="false"
             android:label="@string/game_da_le_tou" />
         <activity
-            android:name=".feature.trend.QiXingCaiTrendActivity"
+            android:name=".feature.trend.QXCTrendActivity"
             android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboardHidden|uiMode|density"
             android:exported="false"
             android:label="@string/game_qi_xing_cai" />
         <activity
-            android:name=".feature.trend.PaiLieTrendActivity"
+            android:name=".feature.trend.PLYXTrendActivity"
             android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboardHidden|uiMode|density"
             android:exported="false"
             android:label="@string/game_pai_lie" />

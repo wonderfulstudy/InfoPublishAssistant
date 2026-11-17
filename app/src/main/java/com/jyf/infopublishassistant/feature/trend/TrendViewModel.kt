@@ -38,6 +38,7 @@ data class TrendUiState(
 class TrendViewModel(
     private val repository: LotteryRepository,
     private val game: LotteryGame,
+    private val cacheTarget: Int = HISTORY_CACHE_TARGET,
 ) : ViewModel() {
 
     private val pagingState = MutableStateFlow(PagingState())
@@ -59,9 +60,31 @@ class TrendViewModel(
         )
 
     init {
-        // 进页面先拉第 1 页取最新一期。upsert 以 (game, issue) 为主键去重，
+        // 进页面先拉第 1 页取最新一期。upsert 以 (game, drawNum) 为主键去重，
         // 所以已有缓存时重复拉第 1 页不会产生重复行。
-        viewModelScope.launch { loadPage(page = 1, isRefresh = true) }
+        viewModelScope.launch {
+            loadPage(page = 1, isRefresh = true)
+            fillCacheToTarget()
+        }
+    }
+
+    /** 首屏刷新后把缓存补到 [cacheTarget] 期；已达标时不发任何请求。 */
+    private suspend fun fillCacheToTarget() {
+        if (repository.cachedCount(game) >= cacheTarget) return
+        pagingState.update { it.copy(isRefreshing = true, errorMessage = null) }
+        runCatching { repository.fillCacheTo(game, cacheTarget, PAGE_SIZE) }.fold(
+            onSuccess = { hasMore ->
+                pagingState.update { it.copy(isRefreshing = false, hasMore = hasMore) }
+            },
+            onFailure = { error ->
+                pagingState.update {
+                    it.copy(
+                        isRefreshing = false,
+                        errorMessage = error.message ?: error.javaClass.simpleName,
+                    )
+                }
+            },
+        )
     }
 
     /** 列表滚动接近底部时由 UI 调用。 */
@@ -118,7 +141,11 @@ class TrendViewModel(
     )
 
     companion object {
-        const val PAGE_SIZE = 20
+        /** 与官方接口验证过的 pageSize 一致；改动它同时影响补缓存的请求次数。 */
+        const val PAGE_SIZE = 30
+
+        /** 本地缓存保留「当前往前」的期数，进页面后在后台补齐。 */
+        const val HISTORY_CACHE_TARGET = 500
         private const val STOP_TIMEOUT_MS = 5_000L
 
         fun factory(repository: LotteryRepository, game: LotteryGame): ViewModelProvider.Factory =

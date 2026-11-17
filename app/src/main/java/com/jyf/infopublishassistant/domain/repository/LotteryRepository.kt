@@ -35,4 +35,14 @@ interface LotteryRepository {
      * Room 的 Flow 是异步发射的，刚 upsert 完就读列表长度会拿到旧值，导致重复请求同一页。
      */
     suspend fun cachedCount(game: LotteryGame): Int
+
+    /**
+     * 从缓存末尾继续翻页，直到缓存达到 [target] 条或远端数据取尽。
+     *
+     * 页码由「已缓存条数 ÷ pageSize」换算，因此已达标时不会发出任何请求。
+     *
+     * @return 补完后是否可能还有更早的数据：达到 [target] 时为 true，
+     *   某一页返回不足 pageSize（历史取尽）时为 false
+     */
+    suspend fun fillCacheTo(game: LotteryGame, target: Int, pageSize: Int): Boolean
 }

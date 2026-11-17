@@ -77,7 +77,7 @@ fun DrawNumbers(
                 )
             }
             // getOrElse：远端数据可能缺区或长度不符，界面层按空处理而不是崩溃
-            val zoneNumbers = draw.numbers.getOrElse(zoneIndex) { emptyList() }
+            val zoneNumbers = draw.drawResult.getOrElse(zoneIndex) { emptyList() }
             zoneNumbers.forEach { number ->
                 BallNumber(
                     number = number,

@@ -1,5 +1,6 @@
 package com.jyf.infopublishassistant.data.local
 
+import androidx.room.ColumnInfo
 import androidx.room.Dao
 import androidx.room.Database
 import androidx.room.Entity
@@ -11,24 +12,26 @@ import com.jyf.infopublishassistant.domain.model.LotteryGame
 import kotlinx.coroutines.flow.Flow
 
 /**
- * 复合主键 (game, issue) 让重复拉取同一期时 [Upsert] 天然去重，
+ * 复合主键 (game, 期号) 让重复拉取同一期时 [Upsert] 天然去重，
  * 因此「进入页面先刷新第 1 页」不会产生重复行。
  */
+// 主键写物理列名：drawNum 通过 @ColumnInfo 映射到旧列 issue，避免数据库迁移
 @Entity(tableName = "draw_results", primaryKeys = ["game", "issue"])
 data class DrawResultEntity(
     val game: String,
-    val issue: String,
+    // 物理列名保持 issue：改列名需要数据库迁移，而缓存可随时重建，不值得
+    @ColumnInfo(name = "issue") val drawNum: String,
     val numbersEncoded: String,
 )
 
 fun DrawResultEntity.toDomain(): DrawResult =
-    DrawResult(issue = issue, numbers = DrawNumbersCodec.decode(numbersEncoded))
+    DrawResult(drawNum = drawNum, drawResult = DrawNumbersCodec.decode(numbersEncoded))
 
 fun DrawResult.toEntity(game: LotteryGame): DrawResultEntity =
     DrawResultEntity(
         game = game.name,
-        issue = issue,
-        numbersEncoded = DrawNumbersCodec.encode(numbers),
+        drawNum = drawNum,
+        numbersEncoded = DrawNumbersCodec.encode(drawResult),
     )
 
 @Dao

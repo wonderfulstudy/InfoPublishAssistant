@@ -1,7 +1,7 @@
 package com.jyf.infopublishassistant.data.local
 
 /**
- * [com.jyf.infopublishassistant.domain.model.DrawResult.numbers] 与数据库文本列之间的编解码。
+ * [com.jyf.infopublishassistant.domain.model.DrawResult.drawResult] 与数据库文本列之间的编解码。
  *
  * 采用「区间用 | 分隔、号码用 , 分隔」的紧凑格式（例如 `3,11,19,27,34|5,12`），
  * 避免为嵌套 List 引入 Room TypeConverter，也便于直接读库排查问题。

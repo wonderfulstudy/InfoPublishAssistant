@@ -14,7 +14,7 @@ import kotlin.math.abs
  *
  * @param range 分区取值范围（含两端）
  * @param values 某期开奖在该分区要标记的号码；渲染时自动去重
- * @param connectLines 是否把相邻两期的号码用线条连起来；差值为 1 时不连
+ * @param connectLines 是否把相邻两期的号码用线条连起来；差值为 1 或相同时不连
  * @param textColor 号码与连接线颜色，null 表示跟随页面的 numberColor
  */
 data class TrendGroup(
@@ -38,50 +38,51 @@ data class TrendLayout(
 /** 大乐透前区五分区的区间划分。 */
 private val DA_LE_TOU_FRONT_ZONES = listOf(1..7, 8..14, 15..21, 22..28, 29..35)
 
-/** 相邻两期号码差值为 1（前一个或后一个）时不画连接线。 */
-fun shouldConnectTrendLine(current: Int, other: Int): Boolean = abs(current - other) != 1
+/** 相邻两期号码差值为 1（前一个或后一个）或完全相同时不画连接线。 */
+fun shouldConnectTrendLine(current: Int, other: Int): Boolean = abs(current - other) > 1
 
 /** 各彩种的走势图列结构。 */
 fun LotteryGame.trendLayout(): TrendLayout = when (this) {
-    LotteryGame.DA_LE_TOU -> TrendLayout(
+    LotteryGame.DLT -> TrendLayout(
         showPlainNumbers = false,
         groups = DA_LE_TOU_FRONT_ZONES.map { zone ->
             TrendGroup(
                 range = zone,
-                values = { draw -> draw.numbers.getOrElse(0) { emptyList() }.filter { it in zone } },
+                values = { draw -> draw.drawResult.getOrElse(0) { emptyList() }.filter { it in zone } },
             )
         } + TrendGroup(
             range = 1..12,
-            values = { draw -> draw.numbers.getOrElse(1) { emptyList() } },
+            values = { draw -> draw.drawResult.getOrElse(1) { emptyList() } },
             textColor = TrendBackZoneRed,
         ),
     )
 
-    LotteryGame.QI_XING_CAI -> TrendLayout(
+    LotteryGame.QXC -> TrendLayout(
         showPlainNumbers = true,
         groups = listOf(
+            // zones 已按 1-3 位 / 4-6 位 / 后区 分成三区，直接按下标取组
             TrendGroup(
                 range = 0..9,
-                values = { draw -> draw.numbers.getOrElse(0) { emptyList() }.take(3) },
+                values = { draw -> draw.drawResult.getOrElse(0) { emptyList() } },
             ),
             TrendGroup(
                 range = 0..9,
-                values = { draw -> draw.numbers.getOrElse(0) { emptyList() }.drop(3) },
+                values = { draw -> draw.drawResult.getOrElse(1) { emptyList() } },
             ),
             TrendGroup(
                 range = 0..14,
-                values = { draw -> draw.numbers.getOrElse(1) { emptyList() } },
+                values = { draw -> draw.drawResult.getOrElse(2) { emptyList() } },
                 connectLines = true,
             ),
         ),
     )
 
-    LotteryGame.PAI_LIE -> TrendLayout(
+    LotteryGame.PLYX -> TrendLayout(
         showPlainNumbers = true,
         groups = (0 until 5).map { position ->
             TrendGroup(
                 range = 0..9,
-                values = { draw -> draw.numbers.getOrElse(0) { emptyList() }.drop(position).take(1) },
+                values = { draw -> draw.drawResult.getOrElse(0) { emptyList() }.drop(position).take(1) },
                 connectLines = true,
             )
         },

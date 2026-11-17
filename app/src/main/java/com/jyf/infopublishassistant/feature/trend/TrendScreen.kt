@@ -50,11 +50,20 @@ import com.jyf.infopublishassistant.ui.theme.TextSecondary
 import com.jyf.infopublishassistant.ui.theme.TrendZoneBackgrounds
 import kotlinx.coroutines.launch
 
-private val ISSUE_COLUMN_WIDTH = 65.dp
+private val ISSUE_COLUMN_WIDTH = 45.dp
 private val PLAIN_NUMBERS_COLUMN_WIDTH = 85.dp
 private val ROW_HEIGHT = 15.dp
 private val MIN_SLOT_WIDTH = 6.dp
-private val TREND_LINE_WIDTH = 2.dp
+private val TREND_LINE_WIDTH = 1.dp
+
+/** 期号列字号；需小于 [ROW_HEIGHT] 否则文字会被行高裁切。 */
+private val ISSUE_FONT_SIZE = 11.sp
+
+/** 开奖号码纯文本列字号。 */
+private val PLAIN_NUMBERS_FONT_SIZE = 10.sp
+
+/** 分区内号码字号上限；实际字号按子列宽自动推导，见 TrendGroupCell。 */
+private val MARK_FONT_SIZE = 10.sp
 
 /** 距离列表底部还剩这么多项时预取下一页，避免用户滚到底才开始等网络。 */
 private const val PREFETCH_DISTANCE = 5
@@ -75,7 +84,9 @@ private const val SCROLL_PAGE_SIZE = 3
  * 焦点放在列表容器本身而不是某一行：`focusable()` 不绘制任何视觉，
  * 因此进入页面时不会出现「第一行被高亮」，同时列表内仍有聚焦节点来接收遥控器按键
  * （完全没有焦点的话，上/下键不会路由到列表，滚动就会失效）。
- * 接近底部时自动触发 [onLoadMore] 拉取更早的期数；已无更多数据时按向下键弹出提示。
+ * 显示顺序与缓存相反：缓存按新→旧存储（分页页码换算依赖该顺序），页面反转为旧→新、
+ * 最新一期在底部，进入页面自动滚到最新一行；接近顶部时自动触发 [onLoadMore] 拉取更早的期数，
+ * 已无更早数据时按向上键到顶弹出提示。
  *
  * 文字颜色通过 [issueColor] / [numberColor] 配置，默认取
  * `IssueTextColor` / `DrawNumberTextColor`，可在 ui/theme/Color.kt 里统一修改。
@@ -95,6 +106,8 @@ fun TrendScreen(
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val layout = remember(game) { game.trendLayout() }
+    // 缓存按新→旧存储（分页页码换算依赖该顺序），走势图按阅读习惯反转：旧→新、最新在底部
+    val draws = remember(uiState.draws) { uiState.draws.asReversed() }
 
     /**
      * 以当前可见区为锚点滚动 [delta] 期。
@@ -115,9 +128,9 @@ fun TrendScreen(
             val target = (anchor + delta).coerceIn(0, total - 1)
             listState.scrollToItem(target)
 
-            // 已经停在最后一期且确认没有更多数据时，才提示「到底了」；
+            // 已经停在最旧一期且确认没有更多数据时，才提示「到底了」；
             // 若 hasMore 仍为 true，说明只是还没加载回来，交给预取逻辑继续拉。
-            if (delta > 0 && target == total - 1 && !uiState.hasMore) {
+            if (delta < 0 && target == 0 && !uiState.hasMore) {
                 Toast
                     .makeText(context, context.getString(R.string.trend_no_more), Toast.LENGTH_SHORT)
                     .show()
@@ -191,15 +204,15 @@ fun TrendScreen(
                             },
                     ) {
                         itemsIndexed(
-                            items = uiState.draws,
+                            items = draws,
                             // 期号在同一彩种内唯一，作为 key 可让分页插入时复用已有行
-                            key = { _, draw -> draw.issue },
+                            key = { _, draw -> draw.drawNum },
                         ) { index, draw ->
                             TrendChartRow(
                                 layout = layout,
                                 draw = draw,
-                                previous = uiState.draws.getOrNull(index - 1),
-                                next = uiState.draws.getOrNull(index + 1),
+                                previous = draws.getOrNull(index - 1),
+                                next = draws.getOrNull(index + 1),
                                 slotWidth = slotWidth,
                                 issueColor = issueColor,
                                 numberColor = numberColor,
@@ -211,22 +224,26 @@ fun TrendScreen(
         }
     }
 
-    // 接近底部时预取下一页
-    val lastVisibleIndex by remember {
-        derivedStateOf { listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1 }
+    // 接近顶部（最旧一端）时预取更早的期数
+    val firstVisibleIndex by remember {
+        derivedStateOf { listState.layoutInfo.visibleItemsInfo.firstOrNull()?.index ?: -1 }
     }
-    LaunchedEffect(lastVisibleIndex, uiState.draws.size) {
-        if (lastVisibleIndex >= 0 && lastVisibleIndex >= uiState.draws.size - PREFETCH_DISTANCE) {
+    LaunchedEffect(firstVisibleIndex, uiState.draws.size) {
+        if (firstVisibleIndex in 0..PREFETCH_DISTANCE) {
             onLoadMore()
         }
     }
 
-    // 数据首次到达后把焦点放到列表容器（不是某一行），列表才能接收遥控器按键。
+    // 数据首次到达后滚到最新一期（列表底部）并把焦点放到列表容器（不是某一行），
+    // 列表才能接收遥控器按键。
     // 兜住异常的原因同 GameSelectScreen：FocusRequester 未附着时会抛异常，
     // 而抢焦点失败不应该让页面崩溃。
     LaunchedEffect(uiState.draws.isNotEmpty()) {
         if (uiState.draws.isNotEmpty()) {
-            runCatching { listFocusRequester.requestFocus() }
+            runCatching {
+                listState.scrollToItem(draws.size - 1)
+                listFocusRequester.requestFocus()
+            }
         }
     }
 }
@@ -251,9 +268,9 @@ private fun TrendChartRow(
             contentAlignment = Alignment.CenterStart,
         ) {
             Text(
-                text = stringResource(R.string.trend_issue_format, draw.issue),
+                text = stringResource(R.string.trend_issue_format, draw.drawNum),
                 color = issueColor,
-                fontSize = 16.sp,
+                fontSize = ISSUE_FONT_SIZE,
                 maxLines = 1,
             )
         }
@@ -265,9 +282,9 @@ private fun TrendChartRow(
                 contentAlignment = Alignment.CenterStart,
             ) {
                 Text(
-                    text = draw.numbers.flatten().joinToString(" "),
+                    text = draw.drawResult.flatten().joinToString(" "),
                     color = numberColor,
-                    fontSize = 15.sp,
+                    fontSize = PLAIN_NUMBERS_FONT_SIZE,
                     maxLines = 1,
                 )
             }
@@ -303,6 +320,9 @@ private fun TrendGroupCell(
     val current = if (group.connectLines) group.values(draw).firstOrNull() else null
     val above = if (group.connectLines) previous?.let { group.values(it).firstOrNull() } else null
     val below = if (group.connectLines) next?.let { group.values(it).firstOrNull() } else null
+    // 两位数字宽度约 1.2 倍字号；按子列宽反推字号并以 MARK_FONT_SIZE 封顶，
+    // 窄屏（旋转后）不会再把个位换行裁掉
+    val markFontSize = minOf(MARK_FONT_SIZE.value, slotWidth.value * 0.8f).sp
 
     Box(
         modifier = modifier
@@ -347,8 +367,9 @@ private fun TrendGroupCell(
                         Text(
                             text = value.toString(),
                             color = color,
-                            fontSize = 15.sp,
+                            fontSize = markFontSize,
                             maxLines = 1,
+                            softWrap = false,
                         )
                     }
                 }

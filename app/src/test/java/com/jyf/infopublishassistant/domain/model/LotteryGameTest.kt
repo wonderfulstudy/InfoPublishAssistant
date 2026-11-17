@@ -5,16 +5,16 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * 锁定各彩种的开奖规则。
+ * 锁定各彩种的开奖规则与接口编号。
  *
- * 这些数字写错不会导致崩溃，只会让走势图悄悄显示错误的号码结构，
- * 所以用测试把它们钉住，改动规则时必须显式改测试。
+ * 这些数字写错不会导致崩溃，只会让走势图悄悄显示错误的号码结构、
+ * 或请求到错误彩种的历史数据，所以用测试把它们钉住，改动时必须显式改测试。
  */
 class LotteryGameTest {
 
     @Test
     fun `da le tou is 5 of 35 plus 2 of 12`() {
-        val zones = LotteryGame.DA_LE_TOU.zones
+        val zones = LotteryGame.DLT.zones
         assertEquals(2, zones.size)
         assertEquals(5, zones[0].count)
         assertEquals(1..35, zones[0].numberRange)
@@ -24,24 +24,34 @@ class LotteryGameTest {
     }
 
     @Test
-    fun `qi xing cai is 6 positional digits plus 1 back digit 0 to 14`() {
-        val zones = LotteryGame.QI_XING_CAI.zones
-        assertEquals(2, zones.size)
-        assertEquals(6, zones[0].count)
+    fun `qi xing cai splits six positional digits into two groups plus 1 back digit`() {
+        val zones = LotteryGame.QXC.zones
+        assertEquals(3, zones.size)
+        assertEquals(3, zones[0].count)
         assertEquals(0..9, zones[0].numberRange)
         assertTrue(zones[0].positional)
-        assertEquals(1, zones[1].count)
-        assertEquals(0..14, zones[1].numberRange)
+        assertEquals(3, zones[1].count)
+        assertEquals(0..9, zones[1].numberRange)
         assertTrue(zones[1].positional)
+        assertEquals(1, zones[2].count)
+        assertEquals(0..14, zones[2].numberRange)
+        assertTrue(zones[2].positional)
     }
 
     @Test
     fun `pai lie is 5 positional digits`() {
-        val zones = LotteryGame.PAI_LIE.zones
+        val zones = LotteryGame.PLYX.zones
         assertEquals(1, zones.size)
         assertEquals(5, zones[0].count)
         assertEquals(0..9, zones[0].numberRange)
         assertTrue(zones[0].positional)
+    }
+
+    @Test
+    fun `each game maps to its sporttery gameNo`() {
+        assertEquals("85", LotteryGame.DLT.apiGameNo)
+        assertEquals("04", LotteryGame.QXC.apiGameNo)
+        assertEquals("350133", LotteryGame.PLYX.apiGameNo)
     }
 
     @Test
@@ -62,7 +72,7 @@ class LotteryGameTest {
     @Test
     fun `all three requested games are present`() {
         assertEquals(
-            setOf("大乐透", "七星彩", "排列"),
+            setOf("大乐透", "七星彩", "排列游戏"),
             LotteryGame.entries.map { it.displayName }.toSet(),
         )
     }

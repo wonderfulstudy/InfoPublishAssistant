@@ -32,12 +32,8 @@ class AppContainer(private val context: Context) {
         Room.databaseBuilder(context, LotteryDatabase::class.java, LotteryDatabase.NAME).build()
     }
 
-    /**
-     * TODO(接口实现): 把这里换成你自己的 [LotteryRemoteDataSource] 实现
-     *   （Retrofit / OkHttp / Ktor 均可）。替换后 UI 层与缓存层都无需改动。
-     */
     private val remoteDataSource: LotteryRemoteDataSource by lazy {
-        SampleLotteryRemoteDataSource()
+        SampleLotteryRemoteDataSource(context)
     }
 
     val lotteryRepository: LotteryRepository by lazy {

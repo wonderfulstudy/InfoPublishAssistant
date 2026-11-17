@@ -15,7 +15,7 @@
             "notNull": true
           },
           {
-            "fieldPath": "issue",
+            "fieldPath": "drawNum",
             "columnName": "issue",
             "affinity": "TEXT",
             "notNull": true

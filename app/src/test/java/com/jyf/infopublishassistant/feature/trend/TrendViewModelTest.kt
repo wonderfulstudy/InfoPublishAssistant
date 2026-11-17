@@ -42,40 +42,70 @@ class TrendViewModelTest {
     }
 
     @Test
-    fun `refreshes page one on start`() = runTest(testDispatcher) {
+    fun `refreshes page one and fills the cache until the history runs dry`() = runTest(testDispatcher) {
+        // 50 期 = 30 + 20：第 2 页不满一页即历史取尽，补缓存停在那里
         val repository = FakeLotteryRepository(totalDraws = 50)
         val viewModel = createViewModel(repository)
         backgroundScope.launch { viewModel.uiState.collect { } }
         advanceUntilIdle()
 
-        assertEquals(listOf(1), repository.requestedPages)
-        assertEquals(TrendViewModel.PAGE_SIZE, viewModel.uiState.value.draws.size)
+        assertEquals(listOf(1, 2), repository.requestedPages)
+        assertEquals(50, viewModel.uiState.value.draws.size)
         assertFalse(viewModel.uiState.value.isRefreshing)
+        assertFalse("历史取尽后不应再认为有更多数据", viewModel.uiState.value.hasMore)
+    }
+
+    @Test
+    fun `stops filling once the cache target is reached`() = runTest(testDispatcher) {
+        val repository = FakeLotteryRepository(totalDraws = 600)
+        val viewModel = createViewModel(repository, cacheTarget = 90)
+        backgroundScope.launch { viewModel.uiState.collect { } }
+        advanceUntilIdle()
+
+        assertEquals(listOf(1, 2, 3), repository.requestedPages)
+        assertEquals(90, viewModel.uiState.value.draws.size)
+        assertTrue("达到目标条数时仍应认为有更早的数据", viewModel.uiState.value.hasMore)
+    }
+
+    @Test
+    fun `requests nothing extra when the cache already meets the target`() = runTest(testDispatcher) {
+        val repository = FakeLotteryRepository(totalDraws = 600, preCachedCount = 500)
+        val viewModel = createViewModel(repository)
+        backgroundScope.launch { viewModel.uiState.collect { } }
+        advanceUntilIdle()
+
+        assertEquals("已达标时只应刷新第 1 页", listOf(1), repository.requestedPages)
+        assertEquals(500, viewModel.uiState.value.draws.size)
     }
 
     @Test
     fun `walks pages in order and stops after a partial page`() = runTest(testDispatcher) {
-        // 50 期 = 20 + 20 + 10，第三页不满即视为到底
-        val repository = FakeLotteryRepository(totalDraws = 50)
-        val viewModel = createViewModel(repository)
+        // 100 期 = 30 + 30 + 30 + 10，第四页不满即视为到底
+        val repository = FakeLotteryRepository(totalDraws = 100)
+        val viewModel = createViewModel(repository, cacheTarget = 0)
         backgroundScope.launch { viewModel.uiState.collect { } }
         advanceUntilIdle()
 
         viewModel.loadNextPage()
         advanceUntilIdle()
         assertEquals(listOf(1, 2), repository.requestedPages)
-        assertEquals(40, viewModel.uiState.value.draws.size)
+        assertEquals(60, viewModel.uiState.value.draws.size)
         assertTrue(viewModel.uiState.value.hasMore)
 
         viewModel.loadNextPage()
         advanceUntilIdle()
-        assertEquals(listOf(1, 2, 3), repository.requestedPages)
-        assertEquals(50, viewModel.uiState.value.draws.size)
+        assertEquals(90, viewModel.uiState.value.draws.size)
+        assertTrue(viewModel.uiState.value.hasMore)
+
+        viewModel.loadNextPage()
+        advanceUntilIdle()
+        assertEquals(listOf(1, 2, 3, 4), repository.requestedPages)
+        assertEquals(100, viewModel.uiState.value.draws.size)
         assertFalse("返回不足一页后不应再认为有更多数据", viewModel.uiState.value.hasMore)
 
         viewModel.loadNextPage()
         advanceUntilIdle()
-        assertEquals("hasMore=false 时应拦下请求", listOf(1, 2, 3), repository.requestedPages)
+        assertEquals("hasMore=false 时应拦下请求", listOf(1, 2, 3, 4), repository.requestedPages)
     }
 
     @Test
@@ -84,7 +114,7 @@ class TrendViewModelTest {
         // 若改成内存里自增，重新进入页面时会把已缓存的第 2 页重新拉一遍，
         // 表现为「滚到底一直转圈但列表不增长」。
         val repository = FakeLotteryRepository(totalDraws = 100, preCachedCount = 40)
-        val viewModel = createViewModel(repository)
+        val viewModel = createViewModel(repository, cacheTarget = 0)
         backgroundScope.launch { viewModel.uiState.collect { } }
         advanceUntilIdle()
 
@@ -93,14 +123,14 @@ class TrendViewModelTest {
         viewModel.loadNextPage()
         advanceUntilIdle()
 
-        assertEquals("缓存 40 条时下一页应是第 3 页", listOf(1, 3), repository.requestedPages)
+        assertEquals("缓存 40 条时下一页应是第 2 页", listOf(1, 2), repository.requestedPages)
         assertEquals(60, viewModel.uiState.value.draws.size)
     }
 
     @Test
     fun `keeps cached draws and surfaces the error when loading fails`() = runTest(testDispatcher) {
         val repository = FakeLotteryRepository(totalDraws = 50)
-        val viewModel = createViewModel(repository)
+        val viewModel = createViewModel(repository, cacheTarget = 0)
         backgroundScope.launch { viewModel.uiState.collect { } }
         advanceUntilIdle()
 
@@ -118,7 +148,7 @@ class TrendViewModelTest {
     @Test
     fun `recovers after a failed load`() = runTest(testDispatcher) {
         val repository = FakeLotteryRepository(totalDraws = 50)
-        val viewModel = createViewModel(repository)
+        val viewModel = createViewModel(repository, cacheTarget = 0)
         backgroundScope.launch { viewModel.uiState.collect { } }
         advanceUntilIdle()
 
@@ -133,13 +163,13 @@ class TrendViewModelTest {
 
         assertEquals(null, viewModel.uiState.value.errorMessage)
         assertEquals(listOf(1, 2, 2), repository.requestedPages)
-        assertEquals(40, viewModel.uiState.value.draws.size)
+        assertEquals(50, viewModel.uiState.value.draws.size)
     }
 
     @Test
     fun `ignores loadNextPage while a request is already in flight`() = runTest(testDispatcher) {
         val repository = FakeLotteryRepository(totalDraws = 100)
-        val viewModel = createViewModel(repository)
+        val viewModel = createViewModel(repository, cacheTarget = 0)
         backgroundScope.launch { viewModel.uiState.collect { } }
         advanceUntilIdle()
 
@@ -155,11 +185,11 @@ class TrendViewModelTest {
         gate.complete(Unit)
         advanceUntilIdle()
         assertEquals(listOf(1, 2), repository.requestedPages)
-        assertEquals(40, viewModel.uiState.value.draws.size)
+        assertEquals(60, viewModel.uiState.value.draws.size)
     }
 
-    private fun createViewModel(repository: LotteryRepository) =
-        TrendViewModel(repository, LotteryGame.DA_LE_TOU)
+    private fun createViewModel(repository: LotteryRepository, cacheTarget: Int = TrendViewModel.HISTORY_CACHE_TARGET) =
+        TrendViewModel(repository, LotteryGame.DLT, cacheTarget)
 
     /**
      * 用内存列表模拟「Room 缓存 + 远端分页」。
@@ -177,8 +207,8 @@ class TrendViewModelTest {
         private val allDraws = (0 until totalDraws).map { index ->
             DrawResult(
                 // 期号随 index 递减，模拟真实的时间倒序
-                issue = (1_000_000 - index).toString(),
-                numbers = listOf(listOf(index % 35 + 1, index % 12 + 1)),
+                drawNum = (1_000_000 - index).toString(),
+                drawResult = listOf(listOf(index % 35 + 1, index % 12 + 1)),
             )
         }
 
@@ -197,12 +227,22 @@ class TrendViewModelTest {
             val slice = allDraws.subList(start, minOf(start + pageSize, allDraws.size))
 
             // 按主键去重，模拟 Room 的 @Upsert
-            val knownIssues = cached.map { it.issue }.toSet()
-            cached.addAll(slice.filterNot { it.issue in knownIssues })
+            val knownDrawNums = cached.map { it.drawNum }.toSet()
+            cached.addAll(slice.filterNot { it.drawNum in knownDrawNums })
             drawsFlow.value = cached.toList()
             return slice.size
         }
 
         override suspend fun cachedCount(game: LotteryGame): Int = cached.size
+
+        override suspend fun fillCacheTo(game: LotteryGame, target: Int, pageSize: Int): Boolean {
+            var lastFetched = pageSize
+            while (cached.size < target) {
+                val page = cached.size / pageSize + 1
+                lastFetched = loadPage(game, page, pageSize)
+                if (lastFetched < pageSize) break
+            }
+            return lastFetched == pageSize
+        }
     }
 }

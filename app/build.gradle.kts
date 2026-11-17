@@ -5,6 +5,21 @@ plugins {
 }
 
 android {
+    signingConfigs {
+        create("release") {
+            storeFile = file("tv-release.jks")
+            storePassword = "12345678"
+            keyAlias = "tv"
+            keyPassword = "12345678"
+        }
+    }
+
+    buildTypes {
+        release {
+            signingConfig = signingConfigs.getByName("release")
+        }
+    }
+
     namespace = "com.jyf.infopublishassistant"
     compileSdk {
         version = release(37)
@@ -65,6 +80,7 @@ dependencies {
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.json)
 
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)

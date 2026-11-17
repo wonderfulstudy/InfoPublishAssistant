@@ -39,10 +39,10 @@ object DpadRemapper {
             ScreenRotation.ROTATION_0 -> direction
 
             ScreenRotation.ROTATION_90 -> when (direction) {
-                DpadDirection.UP -> DpadDirection.LEFT
-                DpadDirection.DOWN -> DpadDirection.RIGHT
-                DpadDirection.LEFT -> DpadDirection.DOWN
-                DpadDirection.RIGHT -> DpadDirection.UP
+                DpadDirection.UP -> DpadDirection.RIGHT
+                DpadDirection.DOWN -> DpadDirection.LEFT
+                DpadDirection.LEFT -> DpadDirection.UP
+                DpadDirection.RIGHT -> DpadDirection.DOWN
             }
 
             ScreenRotation.ROTATION_180 -> when (direction) {
@@ -53,10 +53,10 @@ object DpadRemapper {
             }
 
             ScreenRotation.ROTATION_270 -> when (direction) {
-                DpadDirection.UP -> DpadDirection.RIGHT
-                DpadDirection.DOWN -> DpadDirection.LEFT
-                DpadDirection.LEFT -> DpadDirection.UP
-                DpadDirection.RIGHT -> DpadDirection.DOWN
+                DpadDirection.UP -> DpadDirection.LEFT
+                DpadDirection.DOWN -> DpadDirection.RIGHT
+                DpadDirection.LEFT -> DpadDirection.DOWN
+                DpadDirection.RIGHT -> DpadDirection.UP
             }
         }
 

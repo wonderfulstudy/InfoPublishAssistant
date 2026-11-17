@@ -12,7 +12,7 @@ import com.jyf.infopublishassistant.feature.settings.SettingsActivity
 /**
  * 走势图页面基类。
  *
- * 五个彩种各有一个独立 Activity（满足「每个游戏独立页面」的要求，
+ * 每个彩种各有一个独立 Activity（满足「每个游戏独立页面」的要求，
  * 也便于单独配置 label / orientation / 主题），但业务逻辑全部收敛在这里：
  * 子类只需声明自己对应哪个 [LotteryGame]。
  *

@@ -1,112 +1,108 @@
 package com.jyf.infopublishassistant.data.remote
 
+import com.jyf.infopublishassistant.domain.model.DrawResult
 import com.jyf.infopublishassistant.domain.model.LotteryGame
-import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
-import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.IOException
 
+/**
+ * 钉住官方历史开奖接口的请求与解析契约：
+ * URL 上的 gameNo / 分页参数，以及 `lotteryDrawNum`、`lotteryDrawResult`
+ * 到 [com.jyf.infopublishassistant.domain.model.DrawResult] 的映射。
+ * 解析逻辑纯函数化放在 companion 里，因此无需网络即可测试。
+ */
 class SampleLotteryRemoteDataSourceTest {
 
-    private val dataSource = SampleLotteryRemoteDataSource()
+    private val baseUrl = "https://webapi.sporttery.cn/gateway/lottery"
+    private val historyPath = "/getHistoryPageListV1.qry"
 
     @Test
-    fun `every draw obeys its game rules`() = runTest {
-        LotteryGame.entries.forEach { game ->
-            val draws = dataSource.fetchDrawHistory(game, page = 1, pageSize = 50)
-            assertEquals(50, draws.size)
+    fun `builds the history url with the game number and paging params`() {
+        assertEquals(
+            "$baseUrl$historyPath?gameNo=85&provinceId=0&pageSize=30&isVerify=1&pageNo=2",
+            SampleLotteryRemoteDataSource.buildHistoryUrl(baseUrl, historyPath, LotteryGame.DLT, page = 2, pageSize = 30),
+        )
+        assertEquals(
+            "$baseUrl$historyPath?gameNo=04&provinceId=0&pageSize=30&isVerify=1&pageNo=1",
+            SampleLotteryRemoteDataSource.buildHistoryUrl(baseUrl, historyPath, LotteryGame.QXC, page = 1, pageSize = 30),
+        )
+        assertEquals(
+            "$baseUrl$historyPath?gameNo=350133&provinceId=0&pageSize=30&isVerify=1&pageNo=1",
+            SampleLotteryRemoteDataSource.buildHistoryUrl(baseUrl, historyPath, LotteryGame.PLYX, page = 1, pageSize = 30),
+        )
+    }
 
-            draws.forEach { draw ->
-                assertEquals(
-                    "${game.displayName} 号码区数量不符",
-                    game.zones.size,
-                    draw.numbers.size,
-                )
-                game.zones.forEachIndexed { zoneIndex, zone ->
-                    val numbers = draw.numbers[zoneIndex]
-                    assertEquals(zone.count, numbers.size)
-                    numbers.forEach { number ->
-                        assertTrue(
-                            "${game.displayName} 第 $zoneIndex 区号码 $number 超出 ${zone.numberRange}",
-                            number in zone.numberRange,
-                        )
-                    }
-                    if (!zone.positional) {
-                        // 组合玩法：不重复且升序，与官方展示习惯一致
-                        assertEquals(numbers.sorted(), numbers)
-                        assertEquals(numbers.size, numbers.distinct().size)
-                    }
-                }
-            }
+    @Test
+    fun `joins base url and path with exactly one slash`() {
+        assertEquals(
+            "$baseUrl$historyPath?gameNo=85&provinceId=0&pageSize=30&isVerify=1&pageNo=1",
+            SampleLotteryRemoteDataSource.buildHistoryUrl(baseUrl, "getHistoryPageListV1.qry", LotteryGame.DLT, page = 1, pageSize = 30),
+        )
+        assertEquals(
+            SampleLotteryRemoteDataSource.buildHistoryUrl(baseUrl, historyPath, LotteryGame.DLT, 1, 30),
+            SampleLotteryRemoteDataSource.buildHistoryUrl("$baseUrl/", historyPath, LotteryGame.DLT, 1, 30),
+        )
+    }
+
+    @Test
+    fun `an error envelope without value throws IOException`() {
+        assertThrows(IOException::class.java) {
+            SampleLotteryRemoteDataSource.parseHistory(
+                """{"errorCode":"404","errorMessage":"接口不存在"}""",
+                LotteryGame.DLT,
+            )
         }
-    }
-
-    @Test
-    fun `positional games may repeat digits and keep their order`() = runTest {
-        // 排列、七星彩是按位玩法，如果实现里误加了排序或去重，
-        // 走势数据就全错了。这里用足够多的期数确保确实出现过重复数字。
-        val draws = dataSource.fetchDrawHistory(LotteryGame.PAI_LIE, page = 1, pageSize = 200)
-        val hasRepeat = draws.any { draw -> draw.numbers[0].distinct().size < draw.numbers[0].size }
-        assertTrue("200 期排列里应该出现过重复数字", hasRepeat)
-
-        val hasUnsorted = draws.any { draw -> draw.numbers[0] != draw.numbers[0].sorted() }
-        assertTrue("位置玩法不应被排序", hasUnsorted)
-    }
-
-    @Test
-    fun `issues strictly descend within and across pages`() = runTest {
-        val issues = (1..5).flatMap { page ->
-            dataSource.fetchDrawHistory(LotteryGame.DA_LE_TOU, page, 20).map { it.issue }
-        }
-        assertEquals("跨页不应出现重复期号", issues.size, issues.distinct().size)
-
-        // 期号按数值比较即为时间倒序，跨年借位（26001 → 25150）后依然成立
-        val numeric = issues.map { it.toInt() }
-        assertEquals(numeric.sortedDescending(), numeric)
-    }
-
-    @Test
-    fun `issue numbering borrows correctly across the year boundary`() = runTest {
-        val draws = dataSource.fetchDrawHistory(LotteryGame.DA_LE_TOU, page = 1, pageSize = 300)
-        val issues = draws.map { it.issue }
-        assertTrue("应该包含最新一期 26130", issues.contains("26130"))
-        // 第 131 期往前就跨到上一年，年份前缀必须递减而不是变成 26000
-        assertTrue("跨年后应进入 25 年", issues.any { it.startsWith("25") })
-        assertTrue(issues.none { it.endsWith("000") })
-    }
-
-    @Test
-    fun `a page past the sample range is empty`() = runTest {
-        // 样本共 300 期，pageSize 20 时第 15 页是最后一页
-        assertEquals(20, dataSource.fetchDrawHistory(LotteryGame.DA_LE_TOU, 15, 20).size)
-        assertTrue(dataSource.fetchDrawHistory(LotteryGame.DA_LE_TOU, 16, 20).isEmpty())
-    }
-
-    @Test
-    fun `a partial last page returns fewer rows than pageSize`() = runTest {
-        // 300 / 7 = 42 余 6，所以第 43 页只剩 6 条
-        val draws = dataSource.fetchDrawHistory(LotteryGame.DA_LE_TOU, page = 43, pageSize = 7)
-        assertEquals(6, draws.size)
-    }
-
-    @Test
-    fun `the same request is deterministic`() = runTest {
-        // 稳定性很重要：翻页、退出重进、缓存命中后展示的数据必须一致，否则无法对照调试
-        val first = dataSource.fetchDrawHistory(LotteryGame.QI_XING_CAI, page = 3, pageSize = 20)
-        val second = dataSource.fetchDrawHistory(LotteryGame.QI_XING_CAI, page = 3, pageSize = 20)
-        assertEquals(first, second)
     }
 
     @Test
     fun `rejects a non positive page or page size`() {
-        // require 在任何挂起点之前就会抛出，因此这里用 runBlocking 直接断言即可
         assertThrows(IllegalArgumentException::class.java) {
-            runBlocking { dataSource.fetchDrawHistory(LotteryGame.DA_LE_TOU, page = 0, pageSize = 20) }
+            SampleLotteryRemoteDataSource.buildHistoryUrl(baseUrl, historyPath, LotteryGame.DLT, page = 0, pageSize = 30)
         }
         assertThrows(IllegalArgumentException::class.java) {
-            runBlocking { dataSource.fetchDrawHistory(LotteryGame.DA_LE_TOU, page = 1, pageSize = 0) }
+            SampleLotteryRemoteDataSource.buildHistoryUrl(baseUrl, historyPath, LotteryGame.DLT, page = 1, pageSize = 0)
         }
+    }
+
+    @Test
+    fun `maps drawNum and splits the flat result by zone counts`() {
+        val body = """
+            {"value":{"list":[
+              {"lotteryDrawNum":"26125","lotteryDrawResult":"12 13 23 25 29 07 10"},
+              {"lotteryDrawNum":"26124","lotteryDrawResult":"01 05 18 22 33 04 09"}
+            ]}}
+        """.trimIndent()
+
+        val draws = SampleLotteryRemoteDataSource.parseHistory(body, LotteryGame.DLT)
+
+        assertEquals(listOf("26125", "26124"), draws.map { it.drawNum })
+        assertEquals(listOf(listOf(12, 13, 23, 25, 29), listOf(7, 10)), draws[0].drawResult)
+        assertEquals(listOf(listOf(1, 5, 18, 22, 33), listOf(4, 9)), draws[1].drawResult)
+    }
+
+    @Test
+    fun `qi xing cai result splits into three positional zones`() {
+        val body = """{"value":{"list":[{"lotteryDrawNum":"26125","lotteryDrawResult":"1 2 3 4 5 6 14"}]}}"""
+
+        val draws = SampleLotteryRemoteDataSource.parseHistory(body, LotteryGame.QXC)
+
+        assertEquals(listOf(listOf(1, 2, 3), listOf(4, 5, 6), listOf(14)), draws[0].drawResult)
+    }
+
+    @Test
+    fun `pai lie result stays a single ordered zone`() {
+        val body = """{"value":{"list":[{"lotteryDrawNum":"26125","lotteryDrawResult":"4 7 3 8 6"}]}}"""
+
+        val draws = SampleLotteryRemoteDataSource.parseHistory(body, LotteryGame.PLYX)
+
+        assertEquals(listOf(listOf(4, 7, 3, 8, 6)), draws[0].drawResult)
+    }
+
+    @Test
+    fun `an empty list yields no draws`() {
+        val draws = SampleLotteryRemoteDataSource.parseHistory("""{"value":{"list":[]}}""", LotteryGame.DLT)
+        assertEquals(emptyList<DrawResult>(), draws)
     }
 }
